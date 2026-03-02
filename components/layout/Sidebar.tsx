@@ -20,7 +20,7 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 bg-white border-r min-h-screen p-4 flex flex-col">
+    <aside className="fixed left-0 top-0 w-64 h-screen bg-white border-r p-4 flex flex-col z-50">
       <div className="text-xl font-bold mb-8 px-2 text-black">GrowthSheet</div>
       
       <nav className="flex-1 space-y-1">
