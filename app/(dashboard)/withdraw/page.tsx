@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "@/lib/axios";
 
 interface WithdrawalRequest {
   id: number;
   user_id: string;
-  sellerPenName: string; 
+  sellerPenName: string;
   sellerFullName: string;
   full_name: string;
   amount: number;
@@ -33,7 +33,6 @@ export default function WithdrawPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const pageSize = 10;
 
-  // Modal states
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [approveModalOpen, setApproveModalOpen] = useState(false);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -41,6 +40,14 @@ export default function WithdrawPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedItem, setSelectedItem] = useState<WithdrawalRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // ── Approve: slip file ──
+  const [slipFile, setSlipFile] = useState<File | null>(null);
+  const [slipPreview, setSlipPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Reject: comment ──
+  const [rejectComment, setRejectComment] = useState("");
 
   const fetchWithdrawals = async (page = 0) => {
     setLoading(true);
@@ -66,14 +73,41 @@ export default function WithdrawPage() {
     setDetailModalOpen(true);
   };
 
-  const openApproveModal = () => setApproveModalOpen(true);
-  const openRejectModal = () => setRejectModalOpen(true);
+  const openApproveModal = () => {
+    // reset slip state ทุกครั้งที่เปิด modal ใหม่
+    setSlipFile(null);
+    setSlipPreview(null);
+    setApproveModalOpen(true);
+  };
 
+  const openRejectModal = () => {
+    // reset comment ทุกครั้งที่เปิด modal ใหม่
+    setRejectComment("");
+    setRejectModalOpen(true);
+  };
+
+  const handleSlipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setSlipFile(file);
+    if (file) {
+      setSlipPreview(URL.createObjectURL(file));
+    } else {
+      setSlipPreview(null);
+    }
+  };
+
+  // ── Approve: ส่ง multipart/form-data พร้อมไฟล์สลิป ──
   const handleApproveSubmit = async () => {
-    if (!selectedId) return;
+    if (!selectedId || !slipFile) return;
     try {
       setSubmitting(true);
-      await api.put(`/admin/withdraw/${selectedId}/approve`);
+      const formData = new FormData();
+      formData.append("slip", slipFile);
+
+      await api.put(`/admin/withdraw/${selectedId}/approve`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
       alert("อนุมัติสำเร็จ!");
       setApproveModalOpen(false);
       setDetailModalOpen(false);
@@ -87,11 +121,15 @@ export default function WithdrawPage() {
     }
   };
 
+  // ── Reject: ส่ง JSON พร้อม comment ──
   const handleRejectSubmit = async () => {
-    if (!selectedId) return;
+    if (!selectedId || !rejectComment.trim()) return;
     try {
       setSubmitting(true);
-      await api.put(`/admin/withdraw/${selectedId}/reject`);
+      await api.put(`/admin/withdraw/${selectedId}/reject`, {
+        comment: rejectComment.trim(),
+      });
+
       alert("ปฏิเสธสำเร็จ!");
       setRejectModalOpen(false);
       setDetailModalOpen(false);
@@ -146,21 +184,11 @@ export default function WithdrawPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="px-8 py-5 text-sm font-semibold text-gray-600">
-                  ผู้ขอถอนเงิน
-                </th>
-                <th className="px-8 py-5 text-sm font-semibold text-gray-600">
-                  จำนวนเงิน
-                </th>
-                <th className="px-8 py-5 text-sm font-semibold text-gray-600">
-                  ธนาคาร / เลขบัญชี
-                </th>
-                <th className="px-8 py-5 text-sm font-semibold text-gray-600">
-                  วันที่ขอ
-                </th>
-                <th className="px-8 py-5 text-sm font-semibold text-gray-600 text-center">
-                  จัดการ
-                </th>
+                <th className="px-8 py-5 text-sm font-semibold text-gray-600">ผู้ขอถอนเงิน</th>
+                <th className="px-8 py-5 text-sm font-semibold text-gray-600">จำนวนเงิน</th>
+                <th className="px-8 py-5 text-sm font-semibold text-gray-600">ธนาคาร / เลขบัญชี</th>
+                <th className="px-8 py-5 text-sm font-semibold text-gray-600">วันที่ขอ</th>
+                <th className="px-8 py-5 text-sm font-semibold text-gray-600 text-center">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -186,26 +214,20 @@ export default function WithdrawPage() {
                   <tr key={item.id} className="hover:bg-amber-50/30 transition-colors">
                     <td className="px-8 py-6">
                       <div className="flex flex-col">
-                        <span className="font-bold text-base text-gray-900">
-                          {item.sellerFullName}
-                        </span>
+                        <span className="font-bold text-base text-gray-900">{item.sellerFullName}</span>
                         <span className="text-xs text-gray-400 mt-0.5">
-                            {item.sellerPenName && `(${item.sellerPenName}) · `}
+                          {item.sellerPenName && `(${item.sellerPenName}) · `}
                           ID: {String(item.user_id).substring(0, 8)}...
                         </span>
                       </div>
                     </td>
                     <td className="px-8 py-6">
-                      <span className="text-lg font-bold text-green-600">
-                        ฿{formatAmount(item.amount)}
-                      </span>
+                      <span className="text-lg font-bold text-green-600">฿{formatAmount(item.amount)}</span>
                     </td>
                     <td className="px-8 py-6">
                       <div className="flex flex-col">
                         <span className="font-semibold text-gray-700">{item.bank_name}</span>
-                        <span className="text-sm text-gray-400 tracking-wider">
-                          {item.bank_account_number}
-                        </span>
+                        <span className="text-sm text-gray-400 tracking-wider">{item.bank_account_number}</span>
                       </div>
                     </td>
                     <td className="px-8 py-6 text-sm text-gray-500">
@@ -230,12 +252,8 @@ export default function WithdrawPage() {
         {totalPages > 1 && (
           <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
             <p className="text-sm text-gray-500">
-              หน้า{" "}
-              <span className="font-semibold text-gray-700">
-                {currentPage + 1}
-              </span>{" "}
-              จาก{" "}
-              <span className="font-semibold text-gray-700">{totalPages}</span>
+              หน้า <span className="font-semibold text-gray-700">{currentPage + 1}</span>{" "}
+              จาก <span className="font-semibold text-gray-700">{totalPages}</span>
             </p>
             <div className="flex gap-2">
               <button
@@ -270,11 +288,10 @@ export default function WithdrawPage() {
         )}
       </div>
 
-      {/* DETAIL MODAL */}
+      {/* ───────────── DETAIL MODAL ───────────── */}
       {detailModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-40 p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">รายละเอียดคำขอถอนเงิน</h2>
@@ -290,19 +307,15 @@ export default function WithdrawPage() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 overflow-y-auto flex-1 space-y-5">
               {selectedItem ? (
                 <>
-                  {/* Amount highlight */}
                   <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100 rounded-2xl p-5 text-center">
                     <p className="text-sm text-gray-500 mb-1">จำนวนเงินที่ขอถอน</p>
                     <p className="text-4xl font-extrabold text-green-600">
                       ฿{formatAmount(selectedItem.amount)}
                     </p>
                   </div>
-
-                  {/* User info */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-gray-50 rounded-xl p-4">
                       <p className="text-xs text-gray-400 mb-1">ชื่อผู้ขอ</p>
@@ -315,8 +328,6 @@ export default function WithdrawPage() {
                       </p>
                     </div>
                   </div>
-
-                  {/* Bank info */}
                   <div>
                     <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
                       <span className="w-1 h-5 bg-amber-400 rounded-full inline-block" />
@@ -345,7 +356,6 @@ export default function WithdrawPage() {
               )}
             </div>
 
-            {/* Modal Footer */}
             <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
               <button
                 onClick={openRejectModal}
@@ -366,41 +376,91 @@ export default function WithdrawPage() {
         </div>
       )}
 
-      {/* APPROVE MODAL */}
+      {/* ───────────── APPROVE MODAL (พร้อม slip upload) ───────────── */}
       {approveModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-5">
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
                 <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-gray-900">ยืนยันการอนุมัติ</h2>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">อนุมัติการถอนเงิน</h2>
+                <p className="text-sm text-gray-400">
+                  {selectedItem?.sellerFullName} · ฿{selectedItem ? formatAmount(selectedItem.amount) : "-"}
+                </p>
+              </div>
             </div>
-            <p className="text-gray-600">
-              คุณต้องการอนุมัติการถอนเงินจำนวน{" "}
-              <strong className="text-green-600">
-                ฿{selectedItem ? formatAmount(selectedItem.amount) : "-"}
-              </strong>{" "}
-              ให้กับ <strong>{selectedItem?.sellerFullName}</strong> ใช่หรือไม่?
-            </p>
-            <p className="text-sm text-gray-400 mt-2">
-              เงินจะถูกโอนไปยังบัญชี {selectedItem?.bank_name} เลขที่{" "}
-              {selectedItem?.bank_account_number}
-            </p>
-            <div className="flex justify-end gap-3 mt-6">
+
+            {/* Slip Upload Area */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                แนบสลิปการโอนเงิน <span className="text-red-500">*</span>
+              </label>
+
+              {/* Preview */}
+              {slipPreview ? (
+                <div className="relative rounded-xl overflow-hidden border-2 border-green-200">
+                  <img
+                    src={slipPreview}
+                    alt="slip preview"
+                    className="w-full max-h-56 object-contain bg-gray-50"
+                  />
+                  <button
+                    onClick={() => {
+                      setSlipFile(null);
+                      setSlipPreview(null);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                    className="absolute top-2 right-2 bg-white/80 hover:bg-white text-gray-500 hover:text-red-500 rounded-full p-1 shadow transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                // Drop zone
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full border-2 border-dashed border-gray-200 hover:border-green-300 hover:bg-green-50/30 rounded-xl py-10 flex flex-col items-center gap-2 text-gray-400 hover:text-green-600 transition-colors"
+                >
+                  <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm font-medium">คลิกเพื่อเลือกไฟล์สลิป</span>
+                  <span className="text-xs text-gray-300">PNG, JPG, WEBP ไม่เกิน 10MB</span>
+                </button>
+              )}
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleSlipChange}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 pt-1">
               <button
                 onClick={() => setApproveModalOpen(false)}
                 disabled={submitting}
-                className="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-medium"
+                className="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-medium disabled:opacity-50"
               >
                 ยกเลิก
               </button>
               <button
                 onClick={handleApproveSubmit}
-                disabled={submitting}
-                className="px-5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm transition-colors disabled:opacity-60"
+                // ปุ่ม submit จะ active ก็ต่อเมื่อเลือกไฟล์แล้วเท่านั้น
+                disabled={submitting || !slipFile}
+                className="px-5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {submitting ? "กำลังดำเนินการ..." : "ยืนยันการอนุมัติ"}
               </button>
@@ -409,37 +469,56 @@ export default function WithdrawPage() {
         </div>
       )}
 
-      {/* REJECT MODAL */}
+      {/* ───────────── REJECT MODAL (พร้อม comment) ───────────── */}
       {rejectModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-5">
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
                 <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-gray-900">ยืนยันการปฏิเสธ</h2>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">ปฏิเสธคำขอถอนเงิน</h2>
+                <p className="text-sm text-gray-400">
+                  {selectedItem?.sellerFullName} · ฿{selectedItem ? formatAmount(selectedItem.amount) : "-"}
+                </p>
+              </div>
             </div>
-            <p className="text-gray-600 mb-1">
-              คุณต้องการปฏิเสธคำขอถอนเงินจำนวน{" "}
-              <strong className="text-red-500">
-                ฿{selectedItem ? formatAmount(selectedItem.amount) : "-"}
-              </strong>{" "}
-              ของ <strong>{selectedItem?.sellerFullName}</strong> ใช่หรือไม่?
-            </p>
-            <div className="flex justify-end gap-3 mt-6">
+
+            {/* Comment Input */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                เหตุผลที่ปฏิเสธ <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                rows={4}
+                value={rejectComment}
+                onChange={(e) => setRejectComment(e.target.value)}
+                placeholder="ระบุเหตุผลที่ปฏิเสธคำขอนี้..."
+                className="w-full border border-gray-200 focus:border-red-300 focus:ring-2 focus:ring-red-100 rounded-xl px-4 py-3 text-sm text-gray-700 placeholder-gray-300 resize-none outline-none transition"
+              />
+              <p className="text-xs text-gray-400 mt-1 text-right">
+                {rejectComment.trim().length} ตัวอักษร
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 pt-1">
               <button
                 onClick={() => setRejectModalOpen(false)}
                 disabled={submitting}
-                className="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-medium"
+                className="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-medium disabled:opacity-50"
               >
                 ยกเลิก
               </button>
               <button
                 onClick={handleRejectSubmit}
-                disabled={submitting}
-                className="px-5 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors disabled:opacity-60"
+                // ปุ่ม submit จะ active ก็ต่อเมื่อกรอกเหตุผลแล้วเท่านั้น
+                disabled={submitting || !rejectComment.trim()}
+                className="px-5 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {submitting ? "กำลังดำเนินการ..." : "ยืนยันการปฏิเสธ"}
               </button>
