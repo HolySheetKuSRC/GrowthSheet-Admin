@@ -289,30 +289,53 @@ export default function SheetsPage() {
                   {/* รูปภาพตัวอย่าง */}
                   <div>
                     <h3 className="font-bold text-gray-900 mb-3">รูปภาพตัวอย่าง</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-500 mb-2">รูปตัวอย่าง</p>
-                        {sheetDetail.imageUrl ? (
+                    {sheetDetail.previewImages?.length > 0 ? (
+                      <div className="grid grid-cols-3 gap-3">
+                        {sheetDetail.previewImages.map((url: string, i: number) => (
                           <button
-                            onClick={() => setPreviewImageUrl(sheetDetail.imageUrl)}
-                            className="group relative w-full"
+                            key={i}
+                            onClick={() => setPreviewImageUrl(url)}
+                            className="group relative"
                           >
                             <img
-                              src={sheetDetail.imageUrl}
-                              alt="Sheet Preview"
-                              className="w-full h-48 object-cover rounded-xl border border-gray-200 group-hover:opacity-80 transition-opacity"
+                              src={url}
+                              alt={`Preview ${i + 1}`}
+                              className="w-full h-32 object-cover rounded-xl border border-gray-200 group-hover:opacity-80 transition-opacity"
                             />
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <span className="bg-black/50 text-white text-xs px-3 py-1.5 rounded-lg font-medium">ขยาย</span>
+                              <span className="bg-black/50 text-white text-xs px-2 py-1 rounded-lg">ขยาย</span>
                             </div>
                           </button>
-                        ) : (
-                          <div className="w-full h-48 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400">
-                            ไม่มีรูปภาพ
-                          </div>
-                        )}
+                        ))}
                       </div>
-                    </div>
+                    ) : (
+                      <div className="w-full h-32 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400">
+                        ไม่มีรูปภาพ
+                      </div>
+                    )}
+                  </div>
+
+                  <hr className="border-gray-100" />
+
+                  {/* PDF */}
+                  <div>
+                    <h3 className="font-bold text-gray-900 mb-3">ไฟล์ PDF</h3>
+                    {sheetDetail.fileUrl ? (
+                      <a
+                        href={sheetDetail.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold px-5 py-3 rounded-xl border border-blue-200 transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                            d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        เปิดไฟล์ PDF
+                      </a>
+                    ) : (
+                      <p className="text-gray-400">ไม่มีไฟล์ PDF</p>
+                    )}
                   </div>
 
                   {/* lastComment — แสดงเฉพาะตอน REJECTED */}
