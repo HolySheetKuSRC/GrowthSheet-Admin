@@ -19,6 +19,7 @@ export default function Sidebar() {
     { name: "Sheets", href: "/sheets" },
     { name: "Withdrawals", href: "/withdraw" },
     { name: "Reports", href: "/reports" },
+    { name: "Refunds", href: "/refunds" },
   ];
 
   return (
