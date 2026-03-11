@@ -22,14 +22,31 @@ interface RefundRequest {
   updatedAt: string;
 }
 
+// ✅ เปลี่ยน APPROVED → REFUNDED ให้ตรงกับ enum จริง
+type StatusFilter = "ALL" | "PENDING" | "REFUNDED" | "REJECTED";
+
+const STATUS_TABS: { label: string; value: StatusFilter }[] = [
+  { label: "ทั้งหมด", value: "ALL" },
+  { label: "รออนุมัติ", value: "PENDING" },
+  { label: "คืนเงินแล้ว", value: "REFUNDED" },  // ✅ APPROVED → REFUNDED
+  { label: "ปฏิเสธแล้ว", value: "REJECTED" },
+];
+
+const STATUS_BADGE: Record<string, { label: string; className: string }> = {
+  PENDING: { label: "รออนุมัติ", className: "bg-amber-100 text-amber-700 border border-amber-200" },
+  REFUNDED: { label: "คืนเงินแล้ว", className: "bg-green-100 text-green-700 border border-green-200" },
+  REJECTED: { label: "ปฏิเสธแล้ว", className: "bg-red-100 text-red-600 border border-red-200" },
+};
+
 export default function RefundPage() {
   const [requests, setRequests] = useState<RefundRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<StatusFilter>("PENDING");
 
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [approveModalOpen, setApproveModalOpen] = useState(false);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
-  const [pdfModalOpen, setPdfModalOpen] = useState(false); // ✅ เพิ่ม
+  const [pdfModalOpen, setPdfModalOpen] = useState(false);
 
   const [selectedItem, setSelectedItem] = useState<RefundRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -41,12 +58,12 @@ export default function RefundPage() {
 
   const [rejectComment, setRejectComment] = useState("");
 
-  const fetchRefunds = async () => {
+  const fetchRefunds = async (status: StatusFilter) => {
     setLoading(true);
     try {
-      const res = await api.get("/admin/refunds/pending");
+      const params = status !== "ALL" ? { status } : {};
+      const res = await api.get("/admin/refunds", { params });
       setRequests(res.data);
-      console.log("refund data:", res.data);
     } catch (err) {
       console.error("Fetch Error:", err);
     } finally {
@@ -55,8 +72,8 @@ export default function RefundPage() {
   };
 
   useEffect(() => {
-    fetchRefunds();
-  }, []);
+    fetchRefunds(activeTab);
+  }, [activeTab]);
 
   const openDetailModal = (item: RefundRequest) => {
     setSelectedItem(item);
@@ -75,10 +92,7 @@ export default function RefundPage() {
     setRejectModalOpen(true);
   };
 
-  // ✅ เปิด PDF Modal โดยไม่ปิด Detail Modal
-  const openPdfModal = () => {
-    setPdfModalOpen(true);
-  };
+  const openPdfModal = () => setPdfModalOpen(true);
 
   const handleSlipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
@@ -92,9 +106,7 @@ export default function RefundPage() {
       setSubmitting(true);
       const formData = new FormData();
       formData.append("slip", slipFile);
-      if (approveComment.trim()) {
-        formData.append("comment", approveComment.trim());
-      }
+      if (approveComment.trim()) formData.append("comment", approveComment.trim());
       await api.patch(`/admin/refunds/${selectedItem.id}/approve`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
@@ -102,7 +114,7 @@ export default function RefundPage() {
       setApproveModalOpen(false);
       setDetailModalOpen(false);
       setSelectedItem(null);
-      fetchRefunds();
+      fetchRefunds(activeTab);
     } catch (err: any) {
       alert(err.response?.data?.message || "เกิดข้อผิดพลาด");
     } finally {
@@ -121,7 +133,7 @@ export default function RefundPage() {
       setRejectModalOpen(false);
       setDetailModalOpen(false);
       setSelectedItem(null);
-      fetchRefunds();
+      fetchRefunds(activeTab);
     } catch (err: any) {
       alert(err.response?.data?.message || "เกิดข้อผิดพลาด");
     } finally {
@@ -152,9 +164,31 @@ export default function RefundPage() {
           </p>
         </div>
         <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border border-gray-100">
-          <span className="text-sm text-gray-500">รอดำเนินการ: </span>
+          <span className="text-sm text-gray-500">รายการ: </span>
           <span className="text-lg font-bold text-amber-500">{requests.length}</span>
         </div>
+      </div>
+
+      {/* ── Status Filter Tabs ── */}
+      <div className="flex gap-2 flex-wrap">
+        {STATUS_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setActiveTab(tab.value)}
+            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all border ${activeTab === tab.value
+              ? tab.value === "PENDING"
+                ? "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-100"
+                : tab.value === "REFUNDED"   // ✅ เปลี่ยนจาก APPROVED
+                  ? "bg-green-600 text-white border-green-600 shadow-md shadow-green-100"
+                  : tab.value === "REJECTED"
+                    ? "bg-red-500 text-white border-red-500 shadow-md shadow-red-100"
+                    : "bg-gray-800 text-white border-gray-800 shadow-md"
+              : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"
+              }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* ── Table ── */}
@@ -167,25 +201,28 @@ export default function RefundPage() {
                 <th className="px-8 py-5 text-sm font-semibold text-gray-600">ธนาคาร / บัญชี</th>
                 <th className="px-8 py-5 text-sm font-semibold text-gray-600">เหตุผล</th>
                 <th className="px-8 py-5 text-sm font-semibold text-gray-600">วันที่ขอ</th>
+                {activeTab === "ALL" && (
+                  <th className="px-8 py-5 text-sm font-semibold text-gray-600">สถานะ</th>
+                )}
                 <th className="px-8 py-5 text-sm font-semibold text-gray-600 text-center">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center text-gray-400">
+                  <td colSpan={activeTab === "ALL" ? 6 : 5} className="px-8 py-20 text-center text-gray-400">
                     กำลังดึงข้อมูล...
                   </td>
                 </tr>
               ) : requests.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center">
+                  <td colSpan={activeTab === "ALL" ? 6 : 5} className="px-8 py-20 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400">
                       <svg className="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
                           d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      <span>ไม่มีรายการรออนุมัติ</span>
+                      <span>ไม่มีรายการ</span>
                     </div>
                   </td>
                 </tr>
@@ -194,9 +231,7 @@ export default function RefundPage() {
                   <tr key={item.id} className="hover:bg-amber-50/30 transition-colors">
                     <td className="px-8 py-6">
                       <div className="flex flex-col">
-                        <span className="font-bold text-base text-gray-900">
-                          {item.bankAccountName}
-                        </span>
+                        <span className="font-bold text-base text-gray-900">{item.bankAccountName}</span>
                         <span className="text-xs text-gray-400 mt-0.5">
                           User ID: {item.userId?.substring(0, 8)}...
                         </span>
@@ -205,9 +240,7 @@ export default function RefundPage() {
                     <td className="px-8 py-6">
                       <div className="flex flex-col">
                         <span className="font-semibold text-gray-700">{item.bankName}</span>
-                        <span className="text-sm text-gray-400 tracking-wider">
-                          {item.bankAccountNumber}
-                        </span>
+                        <span className="text-sm text-gray-400 tracking-wider">{item.bankAccountNumber}</span>
                       </div>
                     </td>
                     <td className="px-8 py-6">
@@ -216,6 +249,14 @@ export default function RefundPage() {
                     <td className="px-8 py-6 text-sm text-gray-500">
                       {item.createdAt ? formatDate(item.createdAt) : "-"}
                     </td>
+                    {activeTab === "ALL" && (
+                      <td className="px-8 py-6">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${STATUS_BADGE[item.status]?.className ?? "bg-gray-100 text-gray-500"
+                          }`}>
+                          {STATUS_BADGE[item.status]?.label ?? item.status}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-8 py-6 text-center">
                       <button
                         onClick={() => openDetailModal(item)}
@@ -262,10 +303,17 @@ export default function RefundPage() {
                 </div>
                 <div className="bg-gray-50 rounded-xl p-4">
                   <p className="text-xs text-gray-400 mb-1">วันที่ขอ</p>
-                  <p className="font-semibold text-gray-800 text-sm">
-                    {formatDate(selectedItem.createdAt)}
-                  </p>
+                  <p className="font-semibold text-gray-800 text-sm">{formatDate(selectedItem.createdAt)}</p>
                 </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">สถานะ:</span>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${STATUS_BADGE[selectedItem.status]?.className ?? "bg-gray-100 text-gray-500"
+                  }`}>
+                  {STATUS_BADGE[selectedItem.status]?.label ?? selectedItem.status}
+                </span>
               </div>
 
               {/* ข้อมูลบัญชีรับเงิน */}
@@ -320,7 +368,37 @@ export default function RefundPage() {
                 </div>
               )}
 
-              {/* ข้อมูล Order และไฟล์ PDF */}
+              {/* Refund Slip (กรณี APPROVED/REFUNDED) */}
+              {selectedItem.refundSlipUrl && (
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <span className="w-1 h-5 bg-green-400 rounded-full inline-block" />
+                    สลิปการโอนเงิน
+                  </h3>
+                  <a href={selectedItem.refundSlipUrl} target="_blank" rel="noopener noreferrer">
+                    <img
+                      src={selectedItem.refundSlipUrl}
+                      alt="refund slip"
+                      className="w-full max-h-48 object-contain rounded-xl border border-gray-200 bg-gray-50"
+                    />
+                  </a>
+                </div>
+              )}
+
+              {/* Admin Comment */}
+              {selectedItem.adminComment && (
+                <div>
+                  <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                    <span className="w-1 h-5 bg-indigo-400 rounded-full inline-block" />
+                    หมายเหตุจาก Admin
+                  </h3>
+                  <div className="bg-indigo-50 rounded-xl p-4">
+                    <p className="text-sm text-indigo-800 leading-relaxed">{selectedItem.adminComment}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* ข้อมูล Order */}
               <div>
                 <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
                   <span className="w-1 h-5 bg-gray-400 rounded-full inline-block" />
@@ -336,8 +414,6 @@ export default function RefundPage() {
                       {selectedItem.sheetName || "-"}
                     </span>
                   </div>
-
-                  {/* ✅ ปุ่มเปิด PDF Modal แทนการเปิด Tab ใหม่ */}
                   {selectedItem.sheetFileUrl && (
                     <div className="flex justify-between items-center border-t border-gray-200 pt-3">
                       <span className="text-sm text-gray-500">ไฟล์ที่เกิดปัญหา</span>
@@ -353,7 +429,6 @@ export default function RefundPage() {
                       </button>
                     </div>
                   )}
-
                   <div className="flex justify-between items-center border-t border-gray-200 pt-3">
                     <span className="text-sm text-gray-500">Order Item ID</span>
                     <span className="font-mono text-sm text-gray-700">{selectedItem.orderItemId}</span>
@@ -366,31 +441,31 @@ export default function RefundPage() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-              <button
-                onClick={openRejectModal}
-                className="bg-white hover:bg-red-50 text-red-500 border-2 border-red-100 px-6 py-2.5 rounded-xl text-sm font-bold transition-colors"
-              >
-                REJECT
-              </button>
-              <button
-                onClick={openApproveModal}
-                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-colors"
-              >
-                APPROVE
-              </button>
-            </div>
+            {/* ซ่อนปุ่มถ้าไม่ใช่ PENDING */}
+            {selectedItem.status === "PENDING" && (
+              <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                <button
+                  onClick={openRejectModal}
+                  className="bg-white hover:bg-red-50 text-red-500 border-2 border-red-100 px-6 py-2.5 rounded-xl text-sm font-bold transition-colors"
+                >
+                  REJECT
+                </button>
+                <button
+                  onClick={openApproveModal}
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-colors"
+                >
+                  APPROVE
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* ───────────── PDF MODAL ───────────── */}
-      {/* ✅ z-50 สูงกว่า Detail Modal (z-40) เพื่อซ้อนทับได้ */}
       {pdfModalOpen && selectedItem?.sheetFileUrl && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="bg-white w-[1100px] max-w-[92vw] h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden">
-
-            {/* HEADER */}
             <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50">
               <div className="flex items-center gap-3">
                 <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -411,15 +486,9 @@ export default function RefundPage() {
                 Close
               </button>
             </div>
-
-            {/* PDF VIEWER */}
             <div className="flex-1">
-              <iframe
-                src={selectedItem.sheetFileUrl}
-                className="w-full h-full border-0"
-              />
+              <iframe src={selectedItem.sheetFileUrl} className="w-full h-full border-0" />
             </div>
-
           </div>
         </div>
       )}
@@ -441,15 +510,13 @@ export default function RefundPage() {
                 </p>
               </div>
             </div>
-
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 แนบสลิปการโอนเงิน <span className="text-red-500">*</span>
               </label>
               {slipPreview ? (
                 <div className="relative rounded-xl overflow-hidden border-2 border-green-200">
-                  <img src={slipPreview} alt="slip preview"
-                    className="w-full max-h-56 object-contain bg-gray-50" />
+                  <img src={slipPreview} alt="slip preview" className="w-full max-h-56 object-contain bg-gray-50" />
                   <button
                     onClick={() => {
                       setSlipFile(null);
@@ -475,21 +542,15 @@ export default function RefundPage() {
                   <span className="text-xs text-gray-300">PNG, JPG, WEBP ไม่เกิน 10MB</span>
                 </button>
               )}
-              <input ref={fileInputRef} type="file" accept="image/*"
-                className="hidden" onChange={handleSlipChange} />
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleSlipChange} />
             </div>
-
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                หมายเหตุ (ไม่บังคับ)
-              </label>
-              <textarea rows={3} value={approveComment}
-                onChange={(e) => setApproveComment(e.target.value)}
+              <label className="block text-sm font-semibold text-gray-700 mb-2">หมายเหตุ (ไม่บังคับ)</label>
+              <textarea rows={3} value={approveComment} onChange={(e) => setApproveComment(e.target.value)}
                 placeholder="ระบุหมายเหตุเพิ่มเติม..."
                 className="w-full border border-gray-200 focus:border-green-300 focus:ring-2 focus:ring-green-100 rounded-xl px-4 py-3 text-sm text-gray-700 placeholder-gray-300 resize-none outline-none transition"
               />
             </div>
-
             <div className="flex justify-end gap-3 pt-1">
               <button onClick={() => setApproveModalOpen(false)} disabled={submitting}
                 className="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-medium disabled:opacity-50">
@@ -521,21 +582,16 @@ export default function RefundPage() {
                 </p>
               </div>
             </div>
-
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 เหตุผลที่ปฏิเสธ <span className="text-red-500">*</span>
               </label>
-              <textarea rows={4} value={rejectComment}
-                onChange={(e) => setRejectComment(e.target.value)}
+              <textarea rows={4} value={rejectComment} onChange={(e) => setRejectComment(e.target.value)}
                 placeholder="ระบุเหตุผลที่ปฏิเสธคำขอนี้..."
                 className="w-full border border-gray-200 focus:border-red-300 focus:ring-2 focus:ring-red-100 rounded-xl px-4 py-3 text-sm text-gray-700 placeholder-gray-300 resize-none outline-none transition"
               />
-              <p className="text-xs text-gray-400 mt-1 text-right">
-                {rejectComment.trim().length} ตัวอักษร
-              </p>
+              <p className="text-xs text-gray-400 mt-1 text-right">{rejectComment.trim().length} ตัวอักษร</p>
             </div>
-
             <div className="flex justify-end gap-3 pt-1">
               <button onClick={() => setRejectModalOpen(false)} disabled={submitting}
                 className="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-sm font-medium disabled:opacity-50">
