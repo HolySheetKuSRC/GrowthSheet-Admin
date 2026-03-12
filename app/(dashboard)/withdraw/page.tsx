@@ -16,6 +16,22 @@ interface WithdrawalRequest {
   status: string;
   created_at: string;
 }
+interface WithdrawalDetailDTO {
+  id: string;
+  seller_id: string;
+  user_id: string;
+  sellerPenName: string;
+  sellerFullName: string;
+  amount: number;
+  status: string;
+  bank_name: string;
+  bank_account_number: string;
+  bank_account_name: string;
+  note: string | null;
+  created_at: string;
+  slip_url: string | null;
+  transferred_at: string | null;
+}
 
 interface PageData {
   content: WithdrawalRequest[];
@@ -30,23 +46,23 @@ interface PageData {
 type StatusFilter = "ALL" | "PENDING" | "APPROVED" | "REJECTED";
 
 const STATUS_TABS: { label: string; value: StatusFilter }[] = [
-  { label: "ทั้งหมด",     value: "ALL" },
-  { label: "รออนุมัติ",   value: "PENDING" },
+  { label: "ทั้งหมด", value: "ALL" },
+  { label: "รออนุมัติ", value: "PENDING" },
   { label: "อนุมัติแล้ว", value: "APPROVED" },
   { label: "ปฏิเสธแล้ว", value: "REJECTED" },
 ];
 
 const TAB_ACTIVE_COLOR: Record<StatusFilter, string> = {
-  ALL:      "bg-gray-800  text-white border-gray-800  shadow-md",
-  PENDING:  "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-100",
+  ALL: "bg-gray-800  text-white border-gray-800  shadow-md",
+  PENDING: "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-100",
   APPROVED: "bg-green-600 text-white border-green-600 shadow-md shadow-green-100",
   REJECTED: "bg-red-500   text-white border-red-500   shadow-md shadow-red-100",
 };
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  PENDING:  { label: "รออนุมัติ",   className: "bg-amber-100 text-amber-700 border border-amber-200" },
+  PENDING: { label: "รออนุมัติ", className: "bg-amber-100 text-amber-700 border border-amber-200" },
   APPROVED: { label: "อนุมัติแล้ว", className: "bg-green-100 text-green-700 border border-green-200" },
-  REJECTED: { label: "ปฏิเสธแล้ว", className: "bg-red-100   text-red-600   border border-red-200"   },
+  REJECTED: { label: "ปฏิเสธแล้ว", className: "bg-red-100   text-red-600   border border-red-200" },
 };
 
 export default function WithdrawPage() {
@@ -57,6 +73,8 @@ export default function WithdrawPage() {
   const pageSize = 10;
 
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailData, setDetailData] = useState<WithdrawalDetailDTO | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [approveModalOpen, setApproveModalOpen] = useState(false);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
 
@@ -94,10 +112,21 @@ export default function WithdrawPage() {
     fetchWithdrawals(activeTab, currentPage);
   }, [currentPage]);
 
-  const openDetailModal = (item: WithdrawalRequest) => {
+  const openDetailModal = async (item: WithdrawalRequest) => {
     setSelectedId(item.id);
     setSelectedItem(item);
     setDetailModalOpen(true);
+
+    // ดึง detail รวม slipUrl
+    setDetailLoading(true);
+    try {
+      const res = await api.get(`/admin/withdraw/${item.id}`);
+      setDetailData(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   const openApproveModal = () => {
@@ -159,9 +188,9 @@ export default function WithdrawPage() {
     }
   };
 
-  const totalPages   = data?.page?.totalPages ?? 0;
-  const totalItems   = data?.page?.totalElements ?? 0;
-  const requests     = data?.content ?? [];
+  const totalPages = data?.page?.totalPages ?? 0;
+  const totalItems = data?.page?.totalElements ?? 0;
+  const requests = data?.content ?? [];
 
   const formatAmount = (amount: number) =>
     new Intl.NumberFormat("th-TH", { minimumFractionDigits: 2 }).format(amount);
@@ -197,11 +226,10 @@ export default function WithdrawPage() {
           <button
             key={tab.value}
             onClick={() => setActiveTab(tab.value)}
-            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all border ${
-              activeTab === tab.value
-                ? TAB_ACTIVE_COLOR[tab.value]
-                : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"
-            }`}
+            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all border ${activeTab === tab.value
+              ? TAB_ACTIVE_COLOR[tab.value]
+              : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"
+              }`}
           >
             {tab.label}
           </button>
@@ -268,13 +296,24 @@ export default function WithdrawPage() {
                       {item.created_at ? formatDate(item.created_at) : "-"}
                     </td>
                     {/* ✅ Badge เฉพาะ tab ALL */}
+                    {/* ✅ Badge เฉพาะ tab ALL - ปรับแก้ตรงนี้ */}
                     {activeTab === "ALL" && (
-                      <td className="px-8 py-6">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          STATUS_BADGE[item.status]?.className ?? "bg-gray-100 text-gray-500"
-                        }`}>
-                          {STATUS_BADGE[item.status]?.label ?? item.status}
-                        </span>
+                      <td className="px-5 py-6">
+                        <div className="flex items-center justify-start"> {/* หุ้มด้วย div เพื่อคุม layout */}
+                          {(() => {
+                            const statusKey = item.status; // เช่น "APPROVED"
+                            const badge = STATUS_BADGE[statusKey] || {
+                              label: statusKey,
+                              className: "bg-gray-100 text-gray-500 border-gray-200"
+                            };
+
+                            return (
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${badge.className}`}>
+                                {badge.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </td>
                     )}
                     <td className="px-8 py-6 text-center">
@@ -314,11 +353,10 @@ export default function WithdrawPage() {
                   <button
                     key={p}
                     onClick={() => setCurrentPage(p)}
-                    className={`w-9 h-9 rounded-xl text-sm font-bold transition-colors ${
-                      currentPage === p
-                        ? "bg-amber-500 text-white shadow-md shadow-amber-200"
-                        : "border border-gray-200 text-gray-600 hover:bg-white"
-                    }`}
+                    className={`w-9 h-9 rounded-xl text-sm font-bold transition-colors ${currentPage === p
+                      ? "bg-amber-500 text-white shadow-md shadow-amber-200"
+                      : "border border-gray-200 text-gray-600 hover:bg-white"
+                      }`}
                   >
                     {p + 1}
                   </button>
@@ -346,9 +384,8 @@ export default function WithdrawPage() {
               </div>
               {/* ✅ Badge status ใน modal header */}
               {selectedItem && (
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  STATUS_BADGE[selectedItem.status]?.className ?? "bg-gray-100 text-gray-500"
-                }`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${STATUS_BADGE[selectedItem.status]?.className ?? "bg-gray-100 text-gray-500"
+                  }`}>
                   {STATUS_BADGE[selectedItem.status]?.label ?? selectedItem.status}
                 </span>
               )}
@@ -405,6 +442,36 @@ export default function WithdrawPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* สลิป — แสดงเมื่อ APPROVED */}
+                  {detailData?.slip_url && (
+                    <div>
+                      <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                        <span className="w-1 h-5 bg-green-400 rounded-full inline-block" />
+                        สลิปการโอนเงิน
+                      </h3>
+                      <div className="rounded-xl overflow-hidden border border-green-100">
+                        <img
+                          src={detailData.slip_url}
+                          alt="slip"
+                          className="w-full object-contain max-h-64 bg-gray-50"
+                        />
+                      </div>
+                      {detailData.transferred_at && (
+                        <p className="text-xs text-gray-400 mt-1 text-right">
+                          โอนเมื่อ: {formatDate(detailData.transferred_at)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* เหตุผล — แสดงเมื่อ REJECTED */}
+                  {detailData?.note && selectedItem?.status === "REJECTED" && (
+                    <div className="bg-red-50 border border-red-100 rounded-xl p-4">
+                      <p className="text-xs text-red-400 mb-1 font-semibold">เหตุผลที่ปฏิเสธ</p>
+                      <p className="text-sm text-red-700">{detailData.note}</p>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="flex justify-center py-20 text-red-500">ไม่พบข้อมูล</div>
