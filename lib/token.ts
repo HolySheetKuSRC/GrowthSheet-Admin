@@ -7,17 +7,19 @@ export const tokenStorage = {
   getAdminId: () => Cookies.get("admin_id"), // เพิ่มการดึง Admin ID
 
   setTokens: (accessToken: string, refreshToken?: string, adminId?: string) => {
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
     Cookies.set("admin_token", accessToken, {
       path: "/",
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: isHttps,
+      sameSite: "strict", // หรือเปลี่ยนเป็น "lax" ถ้ามีปัญหาข้ามโดเมน
     });
 
     if (refreshToken) {
       Cookies.set("admin_refresh_token", refreshToken, {
         expires: 7,
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: isHttps,
         sameSite: "strict",
       });
     }

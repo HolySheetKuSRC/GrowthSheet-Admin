@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  admin-app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: admin_nextjs
+    restart: always
+    ports:
+      - "3000:3000"
+    # เพิ่ม Environment variables ที่นี่ได้เลย เช่น
+    # environment:
+    #   - NEXT_PUBLIC_API_URL=https://api.example.com
+
+  nginx:
+    image: nginx:alpine
+    container_name: admin_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - admin-app

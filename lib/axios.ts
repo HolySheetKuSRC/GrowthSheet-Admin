@@ -2,7 +2,7 @@ import axios from "axios";
 import { tokenStorage } from "./token";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080",
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://165.22.247.245:8080",
 });
 
 // 1. Request Interceptor: แนบ Access Token และ X-USER-ID
