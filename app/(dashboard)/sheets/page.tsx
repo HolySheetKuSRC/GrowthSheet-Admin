@@ -6,30 +6,30 @@ import api from "@/lib/axios";
 type StatusFilter = "ALL" | "PENDING" | "APPROVED" | "REJECTED";
 
 const STATUS_TABS: { label: string; value: StatusFilter }[] = [
-  { label: "ทั้งหมด",     value: "ALL" },
-  { label: "รออนุมัติ",   value: "PENDING" },
+  { label: "ทั้งหมด", value: "ALL" },
+  { label: "รออนุมัติ", value: "PENDING" },
   { label: "อนุมัติแล้ว", value: "APPROVED" },
   { label: "ปฏิเสธแล้ว", value: "REJECTED" },
 ];
 
 const TAB_ACTIVE_COLOR: Record<StatusFilter, string> = {
-  ALL:      "bg-gray-800  text-white border-gray-800  shadow-md",
-  PENDING:  "bg-blue-600  text-white border-blue-600  shadow-md shadow-blue-100",
+  ALL: "bg-gray-800  text-white border-gray-800  shadow-md",
+  PENDING: "bg-blue-600  text-white border-blue-600  shadow-md shadow-blue-100",
   APPROVED: "bg-green-600 text-white border-green-600 shadow-md shadow-green-100",
   REJECTED: "bg-red-500   text-white border-red-500   shadow-md shadow-red-100",
 };
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  PENDING:  { label: "รออนุมัติ",   className: "bg-amber-100 text-amber-700 border border-amber-200" },
+  PENDING: { label: "รออนุมัติ", className: "bg-amber-100 text-amber-700 border border-amber-200" },
   APPROVED: { label: "อนุมัติแล้ว", className: "bg-green-100 text-green-700 border border-green-200" },
-  REJECTED: { label: "ปฏิเสธแล้ว", className: "bg-red-100   text-red-600   border border-red-200"   },
+  REJECTED: { label: "ปฏิเสธแล้ว", className: "bg-red-100   text-red-600   border border-red-200" },
 };
 
 export default function SheetsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<StatusFilter>("PENDING");
-  const [currentPage, setCurrentPage] = useState(0);  // ✅
+  const [currentPage, setCurrentPage] = useState(0);
 
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [approveModalOpen, setApproveModalOpen] = useState(false);
@@ -59,11 +59,10 @@ export default function SheetsPage() {
   };
 
   useEffect(() => {
-    setCurrentPage(0); // ✅ reset page เมื่อเปลี่ยน tab
+    setCurrentPage(0);
     fetchSheets(activeTab, 0);
   }, [activeTab]);
 
-  // ✅ fetch ใหม่เมื่อเปลี่ยนหน้า
   useEffect(() => {
     fetchSheets(activeTab, currentPage);
   }, [currentPage]);
@@ -85,7 +84,7 @@ export default function SheetsPage() {
   };
 
   const openApproveModal = () => setApproveModalOpen(true);
-  const openRejectModal  = () => { setRejectComment(""); setRejectModalOpen(true); };
+  const openRejectModal = () => { setRejectComment(""); setRejectModalOpen(true); };
 
   const handleApproveSubmit = async () => {
     if (!selectedSheetId) return;
@@ -124,7 +123,7 @@ export default function SheetsPage() {
     }
   };
 
-  const sheets     = data?.content || [];
+  const sheets = data?.content || [];
   const totalPages = data?.totalPages ?? 0;
   const totalItems = data?.totalElements ?? 0;
 
@@ -149,11 +148,10 @@ export default function SheetsPage() {
           <button
             key={tab.value}
             onClick={() => setActiveTab(tab.value)}
-            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all border ${
-              activeTab === tab.value
-                ? TAB_ACTIVE_COLOR[tab.value]
-                : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"
-            }`}
+            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all border ${activeTab === tab.value
+              ? TAB_ACTIVE_COLOR[tab.value]
+              : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700"
+              }`}
           >
             {tab.label}
           </button>
@@ -198,15 +196,15 @@ export default function SheetsPage() {
                   <tr key={sheet.id} className="hover:bg-blue-50/30 transition-colors">
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-4">
-                        {sheet.thumbnailUrl ? (
-                          <img src={sheet.thumbnailUrl} alt={sheet.title}
-                            className="w-12 h-12 rounded-xl object-cover border border-gray-100 shrink-0" />
+                        {sheet.thumbnailUrl || sheet.imageUrl || sheet.image ? (
+                          <img
+                            src={sheet.thumbnailUrl || sheet.imageUrl || sheet.image}
+                            alt={sheet.title}
+                            className="w-12 h-12 rounded-xl object-cover border border-gray-100 shrink-0"
+                          />
                         ) : (
                           <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
-                            <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
+                            {/* SVG Icon เดิม */}
                           </div>
                         )}
                         <div className="flex flex-col">
@@ -223,9 +221,8 @@ export default function SheetsPage() {
                     </td>
                     {activeTab === "ALL" && (
                       <td className="px-8 py-6">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          STATUS_BADGE[sheet.status]?.className ?? "bg-gray-100 text-gray-500"
-                        }`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${STATUS_BADGE[sheet.status]?.className ?? "bg-gray-100 text-gray-500"
+                          }`}>
                           {STATUS_BADGE[sheet.status]?.label ?? sheet.status}
                         </span>
                       </td>
@@ -243,7 +240,6 @@ export default function SheetsPage() {
           </table>
         </div>
 
-        {/* ✅ Pagination */}
         {totalPages > 1 && (
           <div className="px-8 py-4 border-t border-gray-100 flex items-center justify-between">
             <span className="text-sm text-gray-500">
@@ -258,18 +254,16 @@ export default function SheetsPage() {
                 ← ก่อนหน้า
               </button>
 
-              {/* page numbers */}
               {Array.from({ length: totalPages }, (_, i) => i)
                 .filter(i => Math.abs(i - currentPage) <= 2)
                 .map(i => (
                   <button
                     key={i}
                     onClick={() => setCurrentPage(i)}
-                    className={`w-9 h-9 rounded-xl text-sm font-semibold transition-colors ${
-                      i === currentPage
-                        ? "bg-blue-600 text-white"
-                        : "border border-gray-200 text-gray-600 hover:bg-gray-50"
-                    }`}
+                    className={`w-9 h-9 rounded-xl text-sm font-semibold transition-colors ${i === currentPage
+                      ? "bg-blue-600 text-white"
+                      : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                      }`}
                   >
                     {i + 1}
                   </button>
@@ -295,9 +289,8 @@ export default function SheetsPage() {
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">รายละเอียดชีท</h2>
                 {sheetDetail && (
-                  <span className={`mt-1 inline-block px-3 py-0.5 rounded-full text-xs font-bold ${
-                    STATUS_BADGE[sheetDetail.status]?.className ?? "bg-gray-100 text-gray-500"
-                  }`}>
+                  <span className={`mt-1 inline-block px-3 py-0.5 rounded-full text-xs font-bold ${STATUS_BADGE[sheetDetail.status]?.className ?? "bg-gray-100 text-gray-500"
+                    }`}>
                     {STATUS_BADGE[sheetDetail.status]?.label ?? sheetDetail.status}
                   </span>
                 )}
@@ -361,22 +354,21 @@ export default function SheetsPage() {
                     </div>
                   </div>
 
-                  {sheetDetail.previewImages?.length > 0 && (
+                  {/* แสดงเฉพาะรูปปกจาก imageUrl */}
+                  {sheetDetail.imageUrl && (
                     <div>
                       <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
                         <span className="w-1 h-5 bg-purple-400 rounded-full inline-block" />
-                        รูปภาพตัวอย่าง
+                        รูปภาพหน้าปก
                       </h3>
-                      <div className="grid grid-cols-3 gap-3">
-                        {sheetDetail.previewImages.map((url: string, i: number) => (
-                          <button key={i} onClick={() => setPreviewImageUrl(url)} className="group relative">
-                            <img src={url} alt={`Preview ${i + 1}`}
-                              className="w-full h-32 object-cover rounded-xl border border-gray-200 group-hover:opacity-80 transition-opacity" />
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <span className="bg-black/50 text-white text-xs px-2 py-1 rounded-lg">ขยาย</span>
-                            </div>
-                          </button>
-                        ))}
+                      <div className="w-1/2">
+                        <button onClick={() => setPreviewImageUrl(sheetDetail.imageUrl)} className="group relative w-full">
+                          <img src={sheetDetail.imageUrl} alt="Cover Preview"
+                            className="w-full h-auto object-cover rounded-xl border border-gray-200 group-hover:opacity-80 transition-opacity" />
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="bg-black/50 text-white text-sm px-3 py-1.5 rounded-lg font-medium">ขยายดูรูปเต็ม</span>
+                          </div>
+                        </button>
                       </div>
                     </div>
                   )}
